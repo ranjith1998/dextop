@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Multi Desktop App</title>
+<style>
+  :root{
+    --bg:#0b0f18;
+    --panel:#141a26;
+    --panel2:#1c2436;
+    --line:#27324a;
+    --text:#e8edf7;
+    --muted:#93a0bb;
+    --accent:#4f8cff;
+    --accent2:#22d3a6;
+    --danger:#ff5f6d;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font:14px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit;cursor:pointer}
+  .hidden{display:none !important}
+
+  /* ---------- full screen stages ---------- */
+  .screen{
+    position:fixed;inset:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:18px;text-align:center;padding:24px;
+    background:radial-gradient(1200px 700px at 50% 30%,#18233b 0%,#0b0f18 70%);
+    z-index:50;
+  }
+  .fade-out{animation:fadeOut .45s ease forwards}
+  .fade-in{animation:fadeIn .5s ease both}
+  @keyframes fadeOut{to{opacity:0;visibility:hidden}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  /* boot / downloading */
+  .logo{
+    width:96px;height:96px;border-radius:24px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;
+    box-shadow:0 18px 50px rgba(79,140,255,.35);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+  .logo svg{width:52px;height:52px}
+  #boot h1{margin:6px 0 0;font-size:20px;font-weight:600;letter-spacing:.4px}
+  .bar{
+    width:min(420px,80vw);height:8px;border-radius:99px;
+    background:#1d2740;overflow:hidden;border:1px solid var(--line);
+  }
+  .bar > i{display:block;height:100%;width:0%;border-radius:99px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .18s linear}
+  #bootMsg{color:var(--muted);font-size:13px;min-height:19px}
+  #bootPct{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+
+  /* welcome */
+  #welcome h1{
+    margin:0;font-size:clamp(28px,6vw,56px);font-weight:700;letter-spacing:-.5px;
+    background:linear-gradient(90deg,#fff,#8fb6ff 60%,#22d3a6);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  #welcome p{margin:0;color:var(--muted);font-size:16px}
+  .dots{display:flex;gap:8px;margin-top:10px}
+  .dots i{width:9px;height:9px;border-radius:50%;background:var(--accent);opacity:.35;animation:blink 1.2s infinite}
+  .dots i:nth-child(2){animation-delay:.2s}.dots i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+
+  /* number chooser */
+  #chooser h2{margin:0;font-size:clamp(20px,3.4vw,30px)}
+  #chooser p{margin:0;color:var(--muted)}
+  .numbers{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-top:8px}
+  .num{
+    width:150px;padding:16px 12px 14px;border-radius:16px;
+    background:var(--panel);border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+    transition:transform .15s ease,border-color .15s,box-shadow .15s;
+  }
+  .num:hover,.num:focus-visible{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 12px 30px rgba(0,0,0,.45);outline:none}
+  .num b{font-size:34px;line-height:1}
+  .num span{color:var(--muted);font-size:12px}
+  .mini{width:86px;height:56px;display:grid;gap:4px;background:#0e1626;border:1px solid var(--line);border-radius:8px;padding:4px}
+  .mini i{background:linear-gradient(135deg,#31538f,#22d3a6);border-radius:3px;opacity:.85}
+  .m1{grid-template-columns:1fr}
+  .m2{grid-template-columns:1fr 1fr}
+  .m3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  .m3 i:nth-child(3){grid-column:1 / -1}
+  .m4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+
+  /* ---------- stage ---------- */
+  #stage{position:fixed;inset:0;display:flex;flex-direction:column}
+  #topbar{
+    height:44px;flex:0 0 44px;display:flex;align-items:center;gap:12px;padding:0 12px;
+    background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  #topbar .brand{display:flex;align-items:center;gap:8px;font-weight:600}
+  #topbar .brand em{font-style:normal;color:var(--muted);font-weight:400}
+  #topbar .spacer{flex:1}
+  .tbtn{
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:6px 12px;font-size:13px;
+  }
+  .tbtn:hover{border-color:var(--accent)}
+
+  #grid{flex:1;display:grid;gap:8px;padding:8px;min-height:0}
+  #grid[data-count="1"]{grid-template-columns:1fr;grid-template-rows:1fr}
+  #grid[data-count="2"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
+  #grid[data-count="3"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  #grid[data-count="3"] .desktop:nth-child(3){grid-column:1 / -1}
+  #grid[data-count="4"]{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  #grid.zoomed .desktop{display:none}
+  #grid.zoomed .desktop.zoom{display:flex;grid-column:1 / -1;grid-row:1 / -1}
+
+  /* ---------- one desktop = one real computer screen ---------- */
+  .desktop{
+    position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;
+    border-radius:4px;overflow:hidden;background:#000;
+    box-shadow:0 0 0 1px #05080f;
+    contain:layout paint style;
+  }
+  .desktop.active{box-shadow:0 0 0 2px #3b82f6}
+  .wall{position:absolute;inset:0}
+  .wall::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(0,0,0,.18),transparent 22%,transparent 78%,rgba(0,0,0,.32))}
+
+  /* wallpapers (pure CSS, works offline) */
+  .wp0{background:
+    radial-gradient(34% 20% at 63% 50%,rgba(255,241,190,.95),rgba(255,168,80,.6) 45%,rgba(255,120,60,0) 74%),
+    radial-gradient(70% 26% at 63% 72%,rgba(255,170,90,.38),transparent 72%),
+    linear-gradient(180deg,#23345e 0%,#5a3a6a 20%,#b5544b 38%,#e8763b 49%,#f7a44d 55%,#8c4a55 62%,#3a2a4c 78%,#191630 100%)}
+  .wp1{background:
+    radial-gradient(45% 40% at 50% 50%,rgba(140,200,255,.5),transparent 62%),
+    conic-gradient(from 200deg at 52% 50%,#16307f,#2f6fd0,#6b3fd6,#0f2f78,#16307f),
+    linear-gradient(#040a1c,#0a1330)}
+  .wp2{background:
+    radial-gradient(55% 40% at 72% 14%,rgba(255,255,255,.8),transparent 62%),
+    linear-gradient(180deg,#2f7fd6 0%,#82c0f2 42%,#c6e3f8 60%,#5aa02f 61%,#3f7d22 78%,#2c5d18 100%)}
+  .wp3{background:
+    radial-gradient(40% 35% at 25% 20%,rgba(190,120,255,.5),transparent 60%),
+    radial-gradient(45% 40% at 80% 75%,rgba(80,220,200,.35),transparent 62%),
+    linear-gradient(150deg,#2a1450,#140a2e 55%,#08040f)}
+  .wp4{background:
+    radial-gradient(50% 35% at 50% 8%,rgba(120,220,255,.35),transparent 65%),
+    linear-gradient(180deg,#03243a 0%,#064b5e 45%,#0a7d78 65%,#052c33 100%)}
+  .wp5{background:
+    radial-gradient(60% 45% at 50% 100%,rgba(90,110,150,.35),transparent 70%),
+    linear-gradient(180deg,#0d1017,#191d26 60%,#0a0c11)}
+
+  .monitor-tag{
+    position:absolute;top:6px;right:6px;z-index:6;display:flex;align-items:center;gap:6px;
+    opacity:0;transition:opacity .18s;
+  }
+  .desktop:hover .monitor-tag,.desktop.active .monitor-tag{opacity:1}
+  .monitor-tag .name{
+    background:rgba(12,12,12,.82);border:1px solid rgba(255,255,255,.2);border-radius:5px;
+    padding:2px 8px;font-size:11px;color:#fff;
+  }
+  .zbtn{
+    width:24px;height:22px;border:1px solid rgba(255,255,255,.2);border-radius:5px;
+    background:rgba(12,12,12,.82);color:#fff;font-size:12px;line-height:1;
+  }
+  .zbtn:hover{background:rgba(255,255,255,.22)}
+
+  .surface{position:relative;flex:1;min-height:0}
+  .icons{
+    position:absolute;inset:4px auto 4px 4px;z-index:2;
+    display:flex;flex-direction:column;flex-wrap:wrap;align-content:flex-start;
+  }
+  .icon{
+    width:78px;padding:6px 3px 5px;border:1px solid transparent;border-radius:3px;background:transparent;
+    display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.75);
+  }
+  .icon svg{width:34px;height:34px}
+  .icon .lbl{max-width:72px;max-height:2.6em;overflow:hidden;text-align:center;line-height:1.3;word-break:break-word}
+  .icon:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.2)}
+  .icon.sel{background:rgba(0,120,215,.45);border-color:rgba(140,200,255,.85)}
+
+  .windows{position:absolute;inset:0;z-index:4;pointer-events:none}
+  .win{
+    position:absolute;pointer-events:auto;display:flex;flex-direction:column;
+    min-width:210px;min-height:140px;background:#202020;color:#e8e8e8;
+    border:1px solid #3d3d3d;border-radius:8px;overflow:hidden;
+    box-shadow:0 6px 18px rgba(0,0,0,.55);
+    contain:layout paint style;
+  }
+  .win.moving{will-change:transform}
+  .win.max{left:0 !important;top:0 !important;width:100% !important;height:100% !important;border-radius:0}
+  .titlebar{
+    display:flex;align-items:center;height:32px;padding-left:10px;gap:8px;
+    background:#2b2b2b;font-size:12px;cursor:default;
+  }
+  .win.focus .titlebar{background:#323232}
+  .titlebar .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .titlebar svg{width:15px;height:15px;flex:0 0 15px}
+  .wbtn{
+    width:42px;height:32px;border:0;border-radius:0;background:transparent;
+    color:#e8e8e8;font-size:11px;line-height:1;display:grid;place-items:center;
+  }
+  .wbtn:hover{background:rgba(255,255,255,.09)}
+  .wbtn.close:hover{background:#c42b1c;color:#fff}
+  .wbody{flex:1;min-height:0;overflow:auto;background:#1f1f1f}
+  .win ::-webkit-scrollbar,.startmenu::-webkit-scrollbar{width:10px;height:10px}
+  .win ::-webkit-scrollbar-track,.startmenu::-webkit-scrollbar-track{background:transparent}
+  .win ::-webkit-scrollbar-thumb,.startmenu::-webkit-scrollbar-thumb{background:#4d4d4d;border-radius:6px;border:2px solid transparent;background-clip:content-box}
+  .win ::-webkit-scrollbar-thumb:hover,.startmenu::-webkit-scrollbar-thumb:hover{background:#666;background-clip:content-box}
+  .resize{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;
+    background:linear-gradient(135deg,transparent 58%,rgba(255,255,255,.28) 58%,rgba(255,255,255,.28) 72%,transparent 72%)}
+
+  /* ---------- Windows-style taskbar ---------- */
+  .taskbar{
+    position:relative;z-index:5;height:44px;flex:0 0 44px;display:flex;align-items:center;
+    background:#1c1c1cf2;border-top:1px solid rgba(255,255,255,.07);color:#eaeaea;
+  }
+  .tb-left{width:120px;display:flex;align-items:center;gap:6px;padding-left:10px;font-size:11px;color:#e4e4e4;overflow:hidden}
+  .tb-left svg{width:20px;height:20px;flex:0 0 20px}
+  .tb-left span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tb-center{flex:1;display:flex;align-items:center;justify-content:center;gap:3px;min-width:0;overflow:hidden}
+  .tb-right{display:flex;align-items:center;gap:10px;padding-right:10px}
+  .tbtn2{
+    width:38px;height:38px;border:0;border-radius:5px;background:transparent;
+    display:grid;place-items:center;position:relative;flex:0 0 auto;
+  }
+  .tbtn2:hover{background:rgba(255,255,255,.09)}
+  .tbtn2 svg{width:23px;height:23px}
+  .tbtn2.run::after{
+    content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+    width:6px;height:3px;border-radius:2px;background:#8ab4f8;transition:width .15s;
+  }
+  .tbtn2.on{background:rgba(255,255,255,.11)}
+  .tbtn2.on::after{width:16px;background:#5aa9ff}
+  .tray{display:flex;align-items:center;gap:9px}
+  .tray svg{width:15px;height:15px}
+  .lang{font-size:10px;line-height:1.05;text-align:center}
+  .clock{font-size:11px;line-height:1.25;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .clock b{display:block;font-weight:400}
+  .clock i{display:block;font-style:normal}
+
+  /* ---------- Start menu ---------- */
+  .startmenu{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:8px;z-index:8;
+    width:min(430px,94%);max-height:min(430px,88%);overflow:auto;padding:16px;
+    background:#2b2b2bfa;
+    border:1px solid rgba(255,255,255,.1);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.6);
+  }
+  .sm-search{
+    width:100%;height:30px;border-radius:15px;background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.16);color:#eee;padding:0 12px;font-size:12px;outline:none;margin-bottom:14px;
+  }
+  .sm-search:focus{border-color:#5aa9ff}
+  .sm-title{font-size:11px;color:#d6d6d6;margin:0 2px 8px;font-weight:600}
+  .sm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+  .smitem{
+    display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;
+    border:0;background:transparent;border-radius:6px;font-size:11px;color:#eee;text-align:center;
+  }
+  .smitem:hover{background:rgba(255,255,255,.09)}
+  .smitem svg{width:28px;height:28px}
+  .sm-foot{
+    display:flex;align-items:center;gap:9px;margin-top:14px;padding-top:11px;
+    border-top:1px solid rgba(255,255,255,.09);font-size:12px;color:#e4e4e4;
+  }
+  .sm-foot .av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#5aa9ff,#22d3a6)}
+  .sm-foot .grow{flex:1}
+  .sm-power{width:30px;height:30px;border-radius:6px;border:0;background:transparent;display:grid;place-items:center}
+  .sm-power:hover{background:rgba(255,255,255,.11)}
+  .sm-power svg{width:16px;height:16px}
+
+  /* ---------- right-click menu ---------- */
+  .ctxmenu{
+    position:absolute;z-index:9;min-width:186px;padding:5px;font-size:12px;
+    background:#2b2b2bfa;
+    border:1px solid rgba(255,255,255,.12);border-radius:8px;box-shadow:0 8px 22px rgba(0,0,0,.6);
+  }
+  .ctxmenu button{
+    display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;
+    border:0;background:transparent;border-radius:5px;text-align:left;color:#eee;
+  }
+  .ctxmenu button:hover{background:rgba(255,255,255,.1)}
+  .ctxmenu svg{width:15px;height:15px;flex:0 0 15px}
+  .ctxmenu hr{border:0;border-top:1px solid rgba(255,255,255,.1);margin:4px 2px}
+
+  /* ---------- max speed mode ---------- */
+  #stage.turbo *{transition:none !important;animation:none !important}
+  #stage.turbo .win{box-shadow:0 2px 8px rgba(0,0,0,.5)}
+  #stage.turbo .wall::after{display:none}
+  #stage.turbo .icon{text-shadow:0 1px 1px rgba(0,0,0,.9)}
+  #stage.turbo .startmenu,#stage.turbo .ctxmenu{box-shadow:0 4px 12px rgba(0,0,0,.5)}
+  #stage.turbo .startmenu,#stage.turbo .ctxmenu,#stage.turbo .taskbar{background:#242424}
+
+  /* ---------- app internals ---------- */
+  .browser{display:flex;flex-direction:column;height:100%;background:#1f1f1f}
+  .bbar{display:flex;gap:6px;align-items:center;padding:6px 8px;background:#2b2b2b;border-bottom:1px solid #3a3a3a}
+  .bbar input{flex:1;min-width:0;background:#3b3b3b;border:1px solid #4a4a4a;border-radius:14px;
+    color:#eee;padding:5px 12px;font-size:12px;outline:none}
+  .bbar input:focus{border-color:#5aa9ff;background:#454545}
+  .bbar button{background:transparent;border:0;border-radius:5px;padding:5px 8px;font-size:13px;color:#e6e6e6}
+  .bbar button:hover{background:rgba(255,255,255,.1)}
+  .bbar button.on{background:rgba(90,169,255,.28)}
+  .bstatus{
+    position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:10px;
+    padding:7px 12px;font-size:12px;color:#dfe6f0;
+    background:rgba(31,31,31,.97);border-top:1px solid #3a3a3a;
+  }
+  .bstatus span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bstatus button{background:#3b3b3b;border:1px solid #4a4a4a;border-radius:5px;padding:4px 10px;font-size:11px;color:#eee}
+  .bstatus button:hover{border-color:#5aa9ff}
+  .reader{position:absolute;inset:0;overflow:auto;padding:20px 24px 34px;background:#1f1f1f;color:#e8e8e8;font-size:13px;line-height:1.7}
+  .reader h3{margin:16px 0 8px;font-size:17px;font-weight:600}
+  .reader h4{margin:14px 0 6px;font-size:14px;color:#cfcfcf}
+  .reader p{margin:0 0 10px}
+  .reader li{margin:0 0 6px 18px;list-style:disc}
+  .reader a{color:#8fb6ff;text-decoration:none;cursor:pointer}
+  .reader a:hover{text-decoration:underline}
+  .bview{flex:1;min-height:0;position:relative;background:#fff}
+  .bview iframe{width:100%;height:100%;border:0;background:#fff}
+  .homepage{position:absolute;inset:0;overflow:auto;padding:20px;background:#1f1f1f;color:#eee}
+  .homepage h3{margin:0 0 4px;font-size:17px;font-weight:600}
+  .homepage p{margin:0 0 14px;color:#a9a9a9;font-size:12px}
+  .links{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+  .links button{background:#2b2b2b;border:1px solid #3d3d3d;border-radius:8px;padding:12px 6px;font-size:11px;
+    display:flex;flex-direction:column;align-items:center;gap:8px;color:#eee}
+  .links button:hover{background:#353535;border-color:#5aa9ff}
+  .links .dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+  .notice{margin-top:16px;padding:10px 12px;border-left:3px solid #5aa9ff;background:rgba(90,169,255,.12);
+    border-radius:0 6px 6px 0;font-size:12px;color:#dbe6f5}
+  .sr{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .sr button{display:flex;align-items:center;gap:10px;background:#2b2b2b;border:1px solid #3d3d3d;
+    border-radius:8px;padding:10px 12px;font-size:12px;color:#eee;text-align:left}
+  .sr button:hover{border-color:#5aa9ff}
+  .sr small{color:#9a9a9a;display:block;font-size:11px}
+
+  .pad{width:100%;height:100%;border:0;resize:none;background:#1f1f1f;color:#e6e6e6;
+    padding:12px;font:13px/1.6 Consolas,"Cascadia Mono",monospace;outline:none}
+
+  .files{font-size:12px}
+  .files .path{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#2b2b2b;
+    border-bottom:1px solid #3a3a3a;color:#ddd}
+  .files .path b{font-weight:400;background:#3b3b3b;border:1px solid #4a4a4a;border-radius:4px;padding:3px 9px}
+  .flist{display:flex;flex-direction:column;gap:1px;padding:8px}
+  .frow{display:flex;align-items:center;gap:10px;padding:6px 8px;background:transparent;border:1px solid transparent;border-radius:5px;text-align:left;width:100%;color:#e6e6e6}
+  .frow:hover{background:rgba(255,255,255,.07);border-color:#3d3d3d}
+  .frow svg{width:20px;height:20px;flex:0 0 20px}
+  .frow .sz{margin-left:auto;color:#9a9a9a;font-size:11px}
+
+  .term{height:100%;display:flex;flex-direction:column;background:#0c0c0c;font:12px/1.5 Consolas,"Cascadia Mono",monospace}
+  .tout{flex:1;overflow:auto;padding:10px;white-space:pre-wrap;word-break:break-word;color:#ccc}
+  .tin{display:flex;gap:6px;padding:2px 10px 10px}
+  .tin span{color:#f9d849}
+  .tin input{flex:1;background:transparent;border:0;outline:none;color:#eee;font:inherit}
+
+  .settings{padding:16px;font-size:12px;display:flex;flex-direction:column;gap:12px;color:#eaeaea}
+  .settings .card{background:#2b2b2b;border:1px solid #3a3a3a;border-radius:8px;padding:12px}
+  .settings label{display:block;color:#a9a9a9;margin-bottom:7px}
+  .settings input[type=text]{width:100%;background:#3b3b3b;border:1px solid #4a4a4a;border-radius:5px;color:#eee;padding:7px 9px;outline:none}
+  .settings input[type=text]:focus{border-color:#5aa9ff}
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+  .sw{height:40px;border-radius:6px;border:2px solid transparent;background-size:cover}
+  .sw.on{border-color:#5aa9ff;box-shadow:0 0 0 2px rgba(90,169,255,.3)}
+  .settings .row{display:flex;gap:8px;flex-wrap:wrap}
+  .settings .row button{background:#3b3b3b;border:1px solid #4a4a4a;border-radius:5px;padding:7px 12px;font-size:12px;color:#eee}
+  .settings .row button:hover{border-color:#5aa9ff}
+
+  @media (max-width:760px){
+    #grid[data-count="2"],#grid[data-count="3"],#grid[data-count="4"]{grid-template-columns:1fr}
+    #grid[data-count="2"]{grid-template-rows:1fr 1fr}
+    #grid[data-count="3"]{grid-template-rows:repeat(3,1fr)}
+    #grid[data-count="4"]{grid-template-rows:repeat(4,1fr)}
+    #grid[data-count="3"] .desktop:nth-child(3){grid-column:auto}
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. downloading / loading -->
+<div id="boot" class="screen">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="14" height="10" rx="2"/><path d="M6 20h8M9 16v4"/>
+      <rect x="14" y="10" width="8" height="11" rx="2" fill="#0b0f18"/>
+    </svg>
+  </div>
+  <h1>Multi Desktop</h1>
+  <div class="bar"><i id="bootFill"></i></div>
+  <div id="bootPct">0%</div>
+  <div id="bootMsg">Starting…</div>
+</div>
+
+<!-- 2. welcome (2 seconds) -->
+<div id="welcome" class="screen hidden">
+  <h1>Welcome to Multi Desktop App</h1>
+  <p>Your workspaces are ready</p>
+  <div class="dots"><i></i><i></i><i></i></div>
+</div>
+
+<!-- 3. number selection 1-4 -->
+<div id="chooser" class="screen hidden">
+  <h2>How many screens do you want?</h2>
+  <p>One PC shown on that many screens — like plugging monitors into the same HDMI output.</p>
+  <div class="numbers" id="numbers">
+    <button class="num" data-n="1"><div class="mini m1"><i></i></div><b>1</b><span>Single screen</span></button>
+    <button class="num" data-n="2"><div class="mini m2"><i></i><i></i></div><b>2</b><span>Side by side</span></button>
+    <button class="num" data-n="3"><div class="mini m3"><i></i><i></i><i></i></div><b>3</b><span>Two + wide</span></button>
+    <button class="num" data-n="4"><div class="mini m4"><i></i><i></i><i></i><i></i></div><b>4</b><span>Quad grid</span></button>
+  </div>
+</div>
+
+<!-- 4. the desktops -->
+<div id="stage" class="hidden">
+  <header id="topbar">
+    <div class="brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f8cff" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg>
+      Multi Desktop <em id="countLabel"></em>
+    </div>
+    <div class="spacer"></div>
+    <button class="tbtn" id="btnDisplay">Display: Duplicate</button>
+    <button class="tbtn" id="btnTurbo">Max speed: on</button>
+    <button class="tbtn" id="btnBrowserAll">Open browser</button>
+    <button class="tbtn" id="btnChange">Change number</button>
+  </header>
+  <main id="grid"></main>
+</div>
+
+<template id="tplDesktop">
+  <section class="desktop">
+    <div class="wall"></div>
+    <div class="surface">
+      <div class="icons"></div>
+      <div class="windows"></div>
+      <div class="monitor-tag">
+        <span class="name">Desktop</span>
+        <button class="zbtn" title="Full screen this desktop">&#9974;</button>
+      </div>
+      <div class="startmenu hidden"></div>
+    </div>
+    <div class="taskbar">
+      <div class="tb-left"></div>
+      <div class="tb-center"></div>
+      <div class="tb-right">
+        <span class="lang">ENG<br>IN</span>
+        <span class="tray"></span>
+        <span class="clock"><b>--:--</b><i>--</i></span>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================
+     Stage flow:  boot  ->  welcome (2s)  ->  number 1..4  ->  desktops
+     ========================================================= */
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const bootEl = $("#boot"), welcomeEl = $("#welcome"), chooserEl = $("#chooser"), stageEl = $("#stage");
+  const fill = $("#bootFill"), pct = $("#bootPct"), msg = $("#bootMsg");
+
+  const STEPS = [
+    [12, "Downloading system files…"],
+    [34, "Unpacking desktop environment…"],
+    [56, "Loading window manager…"],
+    [74, "Preparing applications…"],
+    [90, "Configuring workspaces…"],
+    [100, "Ready"]
+  ];
+
+  let progress = 0, step = 0;
+  const tick = setInterval(() => {
+    const target = STEPS[step][0];
+    progress = Math.min(target, progress + Math.random() * 7 + 2);
+    fill.style.width = progress + "%";
+    pct.textContent = Math.round(progress) + "%";
+    msg.textContent = STEPS[step][1];
+    if (progress >= target) {
+      if (step < STEPS.length - 1) step++;
+      else { clearInterval(tick); setTimeout(showWelcome, 350); }
+    }
+  }, 90);
+
+  function swap(from, to) {
+    from.classList.add("fade-out");
+    setTimeout(() => {
+      from.classList.add("hidden");
+      from.classList.remove("fade-out");
+      to.classList.remove("hidden");
+      to.classList.add("fade-in");
+    }, 420);
+  }
+
+  function showWelcome() {
+    swap(bootEl, welcomeEl);
+    // welcome stays exactly 2 seconds (after the 420ms cross-fade)
+    setTimeout(() => swap(welcomeEl, chooserEl), 420 + 2000);
+  }
+
+  $("#numbers").addEventListener("click", (e) => {
+    const btn = e.target.closest(".num");
+    if (!btn) return;
+    const n = parseInt(btn.dataset.n, 10);
+    swap(chooserEl, stageEl);
+    setTimeout(() => buildDesktops(n), 430);
+  });
+
+  $("#btnChange").addEventListener("click", () => {
+    grid.textContent = "";
+    grid.classList.remove("zoomed");
+    desks.length = 0;
+    swap(stageEl, chooserEl);
+  });
+
+  // turbo drops shadows, overlays and transitions on slow machines
+  stageEl.classList.add("turbo");
+  $("#btnTurbo").addEventListener("click", (e) => {
+    const on = stageEl.classList.toggle("turbo");
+    e.currentTarget.textContent = "Max speed: " + (on ? "on" : "off");
+  });
+
+  $("#btnDisplay").addEventListener("click", (e) => {
+    mirror = !mirror;
+    e.currentTarget.textContent = "Display: " + (mirror ? "Duplicate" : "Separate PCs");
+    if (desks.length) buildDesktops(desks.length);
+  });
+
+  /* =========================================================
+     Icon artwork (Windows-like)
+     ========================================================= */
+  const PAGE = '<path fill="#fff" d="M11 4h18l9 9v31H11z"/><path fill="#c8d3e0" d="M29 4l9 9h-9z"/>';
+  const ICO = {
+    folder: '<svg viewBox="0 0 48 48"><path fill="#dfa43c" d="M5 11a3 3 0 0 1 3-3h10.7a3 3 0 0 1 2.1.9L24 12h16a3 3 0 0 1 3 3v4H5z"/><path fill="#ffcd6b" d="M5 17h38a2 2 0 0 1 2 2.2l-2.6 17A3 3 0 0 1 39.4 39H8.6a3 3 0 0 1-3-2.6L3 19.2A2 2 0 0 1 5 17z"/></svg>',
+    doc: '<svg viewBox="0 0 48 48">' + PAGE + '<g stroke="#8fa0b5" stroke-width="2" stroke-linecap="round"><path d="M17 21h15M17 27h15M17 33h10"/></g></svg>',
+    pdf: '<svg viewBox="0 0 48 48">' + PAGE + '<rect x="6" y="25" width="28" height="14" rx="2" fill="#e0362c"/><text x="20" y="35.5" text-anchor="middle" font-family="Segoe UI,Arial" font-size="9.5" font-weight="700" fill="#fff">PDF</text></svg>',
+    word: '<svg viewBox="0 0 48 48">' + PAGE + '<rect x="6" y="25" width="28" height="14" rx="2" fill="#1e5eb0"/><text x="20" y="36" text-anchor="middle" font-family="Segoe UI,Arial" font-size="12" font-weight="700" fill="#fff">W</text></svg>',
+    xls: '<svg viewBox="0 0 48 48">' + PAGE + '<rect x="6" y="25" width="28" height="14" rx="2" fill="#1d7145"/><text x="20" y="36" text-anchor="middle" font-family="Segoe UI,Arial" font-size="12" font-weight="700" fill="#fff">X</text></svg>',
+    img: '<svg viewBox="0 0 48 48"><rect x="5" y="9" width="38" height="30" rx="3" fill="#fff"/><rect x="7.5" y="11.5" width="33" height="25" rx="2" fill="#79c4f2"/><circle cx="18" cy="19" r="3.4" fill="#ffe08a"/><path fill="#4b9e46" d="M9 36l9-10 7 8 5-5 8 7z"/></svg>',
+    pc: '<svg viewBox="0 0 48 48"><rect x="3" y="8" width="42" height="27" rx="3" fill="#54748f"/><rect x="5.5" y="10.5" width="37" height="22" rx="2" fill="#8ed3ff"/><path fill="#54748f" d="M18 37h12l2 5H16z"/><rect x="12" y="41" width="24" height="3" rx="1.5" fill="#54748f"/></svg>',
+    bin: '<svg viewBox="0 0 48 48"><path fill="#b7dcf7" fill-opacity=".85" d="M13 14h22l-2.4 26.3a3 3 0 0 1-3 2.7H18.4a3 3 0 0 1-3-2.7z"/><rect x="10" y="8" width="28" height="6" rx="3" fill="#79b3de"/><g stroke="#4a86b8" stroke-width="2" stroke-linecap="round"><path d="M20 21v15M28 21v15"/></g></svg>',
+    edge: '<svg viewBox="0 0 48 48"><defs><linearGradient id="mdEdge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ec7f0"/><stop offset="1" stop-color="#0f5fb0"/></linearGradient></defs><circle cx="24" cy="24" r="19" fill="url(#mdEdge)"/><path fill="#fff" fill-opacity=".92" d="M12.5 27.5c6.5 5 17 5 23 .5-1 8-7.6 13-15 11.4-5.6-1.2-8.6-6.4-8-11.9z"/><path fill="#0a4d8c" fill-opacity=".35" d="M24 5c8.5 0 14.5 5.4 15.4 13H22.5c-5.4 0-9.5 3.2-9.5 7.5C10 13.8 15.8 5 24 5z"/></svg>',
+    notepad: '<svg viewBox="0 0 48 48"><rect x="9" y="5" width="30" height="38" rx="3" fill="#fff"/><path fill="#3a7ebf" d="M9 8a3 3 0 0 1 3-3h24a3 3 0 0 1 3 3v5H9z"/><g stroke="#93a2b5" stroke-width="2" stroke-linecap="round"><path d="M15 21h18M15 27h18M15 33h12"/></g></svg>',
+    terminal: '<svg viewBox="0 0 48 48"><rect x="4" y="8" width="40" height="32" rx="4" fill="#0c0c0c"/><path fill="#2f2f2f" d="M4 12a4 4 0 0 1 4-4h32a4 4 0 0 1 4 4v3H4z"/><g fill="none" stroke="#f2f2f2" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22l5 5-5 5M24 32h10"/></g></svg>',
+    settings: '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="#3b6fb5"/><g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"><circle cx="24" cy="24" r="5.5"/><path d="M24 9v4M24 35v4M9 24h4M35 24h4M13.4 13.4l2.9 2.9M31.7 31.7l2.9 2.9M34.6 13.4l-2.9 2.9M16.3 31.7l-2.9 2.9"/></g></svg>',
+    win: '<svg viewBox="0 0 24 24" fill="#5cb6f2"><rect x="2.5" y="2.5" width="8.5" height="8.5" rx="1"/><rect x="13" y="2.5" width="8.5" height="8.5" rx="1"/><rect x="2.5" y="13" width="8.5" height="8.5" rx="1"/><rect x="13" y="13" width="8.5" height="8.5" rx="1"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>',
+    taskview: '<svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.8"><rect x="2" y="5" width="12" height="14" rx="2"/><path d="M16.5 7.5v9M20 9.5v5"/></svg>',
+    wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 8.6a15 15 0 0 1 19 0M5.6 12.2a11 11 0 0 1 12.8 0M8.8 15.6a6.5 6.5 0 0 1 6.4 0"/><circle cx="12" cy="19" r="1.2" fill="#e8e8e8" stroke="none"/></svg>',
+    volume: '<svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.7" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.3 6.6a8 8 0 0 1 0 10.8" stroke-linecap="round"/></svg>',
+    battery: '<svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.6"><rect x="2" y="7.5" width="18" height="9" rx="2.2"/><rect x="3.6" y="9.1" width="14" height="5.8" rx="1.2" fill="#e8e8e8" stroke="none"/><path d="M22 10.5v3" stroke-linecap="round"/></svg>',
+    sun: '<svg viewBox="0 0 24 24" fill="none" stroke="#ffd166" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4" fill="#ffd166" stroke="none"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>',
+    power: '<svg viewBox="0 0 24 24" fill="none" stroke="#e8e8e8" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.8 6.5a8 8 0 1 0 10.4 0"/></svg>',
+    up: '<svg viewBox="0 0 24 24" fill="none" stroke="#dfe6f0" stroke-width="1.8" stroke-linecap="round"><path d="M12 19V6M6 12l6-6 6 6"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="#dfe6f0" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>'
+  };
+
+  const APPS = [
+    { id: "browser",  name: "Browser",       icon: "edge",     w: 620, h: 400 },
+    { id: "files",    name: "File Explorer", icon: "folder",   w: 460, h: 330 },
+    { id: "notes",    name: "Notepad",       icon: "notepad",  w: 420, h: 320 },
+    { id: "term",     name: "Terminal",      icon: "terminal", w: 500, h: 290 },
+    { id: "settings", name: "Settings",      icon: "settings", w: 440, h: 370 }
+  ];
+
+  const PINNED = ["files", "browser", "notes", "term", "settings"];
+
+  const DESKTOP_ITEMS = [
+    { icon: "pc",       label: "This PC",       app: "files", arg: "C:/" },
+    { icon: "bin",      label: "Recycle Bin",   app: "files", arg: "C:/Recycle Bin/" },
+    { icon: "edge",     label: "Browser",       app: "browser" },
+    { icon: "folder",   label: "Documents",     app: "files", arg: "C:/Documents/" },
+    { icon: "folder",   label: "Pictures",      app: "files", arg: "C:/Pictures/" },
+    { icon: "notepad",  label: "Notepad",       app: "notes" },
+    { icon: "terminal", label: "Terminal",      app: "term" },
+    { icon: "settings", label: "Settings",      app: "settings" },
+    { icon: "doc",      label: "readme.txt",    app: "notes", arg: { title: "readme.txt", text: "Multi Desktop\r\n==============\r\nEvery tile on screen is a full computer desktop." } },
+    { icon: "pdf",      label: "manual.pdf",    app: "notes", arg: { title: "manual.pdf", text: "[PDF preview]\r\n\r\nMulti Desktop user manual\r\nPage 1 of 1" } },
+    { icon: "word",     label: "report.docx",   app: "notes", arg: { title: "report.docx", text: "Monthly report\r\n\r\nAll four desktops are running." } },
+    { icon: "img",      label: "wallpaper.jpg", app: "settings" }
+  ];
+
+  const WALLPAPERS = ["Sunset", "Bloom", "Field", "Nebula", "Ocean", "Graphite"];
+
+  /* =========================================================
+     Desktops
+     ========================================================= */
+  const grid = $("#grid");
+  const tpl = $("#tplDesktop");
+  const desks = [];
+  let zTop = 10;
+  let activeDesk = null;
+  let popupOpen = false;
+  let mirror = true;      // every screen shows the same PC, like an HDMI duplicate
+  let pcName = "This PC";
+
+  // in duplicate mode an action on one screen happens on all of them
+  function screens(desk) {
+    return mirror ? desks : [desk];
+  }
+
+  function buildDesktops(n) {
+    grid.textContent = "";
+    grid.classList.remove("zoomed");
+    desks.length = 0;
+    activeDesk = null;
+    popupOpen = false;
+    grid.dataset.count = String(n);
+    $("#countLabel").textContent = "\u00B7 " + n + (n === 1 ? " screen" : " screens") + (mirror ? " \u00B7 duplicate" : " \u00B7 separate");
+
+    for (let i = 0; i < n; i++) desks.push(createDesktop(i));
+    focusDesk(desks[0]);
+
+    openApp(desks[0], "browser");
+  }
+
+  function svg(name, size) {
+    const span = document.createElement("span");
+    span.style.cssText = "display:grid;place-items:center;line-height:0";
+    span.innerHTML = ICO[name];
+    if (size) {
+      span.firstChild.setAttribute("width", size);
+      span.firstChild.setAttribute("height", size);
+    }
+    return span;
+  }
+
+  function createDesktop(index) {
+    const el = tpl.content.firstElementChild.cloneNode(true);
+    const desk = {
+      index: index,
+      el: el,
+      wall: $(".wall", el),
+      surface: $(".surface", el),
+      iconsEl: $(".icons", el),
+      winsEl: $(".windows", el),
+      menuEl: $(".startmenu", el),
+      nameEl: $(".name", el),
+      leftEl: $(".tb-left", el),
+      centerEl: $(".tb-center", el),
+      trayEl: $(".tray", el),
+      clockT: $(".clock b", el),
+      clockD: $(".clock i", el),
+      name: mirror ? pcName : "Desktop " + (index + 1),
+      theme: mirror ? 0 : index % 6,
+      windows: [],
+      pins: {},
+      focused: null,
+      notes: "",
+      seq: 0
+    };
+
+    desk.nameEl.textContent = screenLabel(desk);
+    desk.wall.classList.add("wp" + desk.theme);
+
+    /* desktop icons */
+    DESKTOP_ITEMS.forEach((item) => {
+      const b = document.createElement("button");
+      b.className = "icon";
+      b.type = "button";
+      b.appendChild(svg(item.icon));
+      const lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = item.label;
+      b.appendChild(lbl);
+      b.addEventListener("click", () => {
+        desk.iconsEl.querySelectorAll(".icon.sel").forEach((x) => x.classList.remove("sel"));
+        b.classList.add("sel");
+      });
+      b.addEventListener("dblclick", () => openApp(desk, item.app, item.arg));
+      b.addEventListener("keydown", (e) => { if (e.key === "Enter") openApp(desk, item.app, item.arg); });
+      desk.iconsEl.appendChild(b);
+    });
+
+    /* taskbar: weather widget, start / search / task view, pinned apps */
+    desk.leftEl.appendChild(svg("sun", 20));
+    const weather = document.createElement("span");
+    weather.textContent = "31\u00B0C  Sunny";
+    desk.leftEl.appendChild(weather);
+
+    const startBtn = tbBtn("win", "Start");
+    startBtn.classList.add("tb-start");
+    startBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const wasOpen = !desk.menuEl.classList.contains("hidden");
+      closeAllPopups();
+      screens(desk).forEach((d) => d.menuEl.classList.toggle("hidden", wasOpen));
+      popupOpen = !wasOpen;
+      focusDesk(desk);
+    });
+    const searchBtn = tbBtn("search", "Search");
+    searchBtn.addEventListener("click", (e) => { e.stopPropagation(); closeAllPopups(); openApp(desk, "browser"); });
+    const viewBtn = tbBtn("taskview", "Task view");
+    viewBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const anyOpen = desk.windows.some((r) => !r.min);
+      desk.windows.forEach((r) => { if (r.min === anyOpen) toggleMin(r); });
+    });
+    desk.centerEl.append(startBtn, searchBtn, viewBtn);
+
+    PINNED.forEach((id) => {
+      const app = APPS.find((a) => a.id === id);
+      const b = tbBtn(app.icon, app.name);
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeAllPopups();
+        const open = desk.windows.filter((r) => r.app.id === id);
+        if (!open.length) { openApp(desk, id); return; }
+        const top = open[open.length - 1];
+        if (desk.focused === top && !top.min) toggleMin(top);
+        else if (top.min) toggleMin(top);
+        else raise(top);
+      });
+      desk.pins[id] = b;
+      desk.centerEl.appendChild(b);
+    });
+
+    ["wifi", "volume", "battery"].forEach((n) => desk.trayEl.appendChild(svg(n, 15)));
+
+    /* start menu */
+    buildStartMenu(desk);
+
+    /* right-click menu on the wallpaper */
+    desk.surface.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".win") || e.target.closest(".startmenu")) return;
+      e.preventDefault();
+      closeAllPopups();
+      focusDesk(desk);
+      showContextMenu(desk, e);
+    });
+
+    $(".zbtn", el).addEventListener("click", (e) => {
+      e.stopPropagation();
+      const on = el.classList.toggle("zoom");
+      grid.classList.toggle("zoomed", on);
+      desks.forEach((d) => { if (d !== desk) d.el.classList.remove("zoom"); });
+      focusDesk(desk);
+    });
+
+    el.addEventListener("pointerdown", () => focusDesk(desk));
+    grid.appendChild(el);
+    return desk;
+  }
+
+  function screenLabel(desk) {
+    return mirror ? pcName + " \u2014 Screen " + (desk.index + 1) : desk.name;
+  }
+
+  function refreshNames() {
+    desks.forEach((d) => {
+      if (mirror) d.name = pcName;
+      d.nameEl.textContent = screenLabel(d);
+    });
+  }
+
+  function tbBtn(icon, title) {
+    const b = document.createElement("button");
+    b.className = "tbtn2";
+    b.type = "button";
+    b.title = title;
+    b.appendChild(svg(icon, 23));
+    return b;
+  }
+
+  function buildStartMenu(desk) {
+    const search = document.createElement("input");
+    search.type = "text";
+    search.className = "sm-search";
+    search.placeholder = "Search apps";
+
+    const title = document.createElement("div");
+    title.className = "sm-title";
+    title.textContent = "Pinned";
+
+    const gridEl = document.createElement("div");
+    gridEl.className = "sm-grid";
+    APPS.forEach((app) => {
+      const b = document.createElement("button");
+      b.className = "smitem";
+      b.type = "button";
+      b.dataset.name = app.name.toLowerCase();
+      b.appendChild(svg(app.icon, 28));
+      const s = document.createElement("span");
+      s.textContent = app.name;
+      b.appendChild(s);
+      b.addEventListener("click", () => { desk.menuEl.classList.add("hidden"); openApp(desk, app.id); });
+      gridEl.appendChild(b);
+    });
+
+    search.addEventListener("input", () => {
+      const q = search.value.trim().toLowerCase();
+      gridEl.querySelectorAll(".smitem").forEach((b) => {
+        b.classList.toggle("hidden", !!q && b.dataset.name.indexOf(q) === -1);
+      });
+    });
+
+    const foot = document.createElement("div");
+    foot.className = "sm-foot";
+    const av = document.createElement("span");
+    av.className = "av";
+    const who = document.createElement("span");
+    who.textContent = "User \u2014 " + desk.name;
+    const grow = document.createElement("span");
+    grow.className = "grow";
+    const power = document.createElement("button");
+    power.className = "sm-power";
+    power.type = "button";
+    power.title = "Close all windows";
+    power.appendChild(svg("power", 16));
+    power.addEventListener("click", () => {
+      desk.menuEl.classList.add("hidden");
+      desk.windows.slice().forEach(closeWin);
+    });
+    foot.append(av, who, grow, power);
+
+    desk.menuEl.append(search, title, gridEl, foot);
+  }
+
+  function showContextMenu(desk, e) {
+    const host = desk.surface.getBoundingClientRect();
+    const x = Math.min(e.clientX - host.left, host.width - 195);
+    const y = Math.min(e.clientY - host.top, host.height - 190);
+    screens(desk).forEach((d) => d.surface.appendChild(contextMenu(d, x, y)));
+    popupOpen = true;
+  }
+
+  function contextMenu(desk, x, y) {
+    const menu = document.createElement("div");
+    menu.className = "ctxmenu";
+    const items = [
+      ["refresh", "Refresh", () => {
+        desk.iconsEl.style.opacity = "0";
+        setTimeout(() => { desk.iconsEl.style.opacity = "1"; }, 120);
+      }],
+      ["notepad", "New text document", () => openApp(desk, "notes", { title: "New Document.txt", text: "" })],
+      ["terminal", "Open in Terminal", () => openApp(desk, "term")],
+      ["edge", "Open Browser", () => openApp(desk, "browser")],
+      ["settings", "Personalise", () => openApp(desk, "settings")]
+    ];
+    items.forEach(([icon, label, fn], i) => {
+      if (i === items.length - 1) menu.appendChild(document.createElement("hr"));
+      const b = document.createElement("button");
+      b.type = "button";
+      b.appendChild(svg(icon, 15));
+      const s = document.createElement("span");
+      s.textContent = label;
+      b.appendChild(s);
+      b.addEventListener("click", () => { closeAllPopups(); fn(); });
+      menu.appendChild(b);
+    });
+    menu.style.left = x + "px";
+    menu.style.top = y + "px";
+    return menu;
+  }
+
+  function closeAllPopups() {
+    if (!popupOpen) return;
+    popupOpen = false;
+    desks.forEach((d) => {
+      d.menuEl.classList.add("hidden");
+      d.surface.querySelectorAll(".ctxmenu").forEach((m) => m.remove());
+    });
+  }
+
+  function focusDesk(desk) {
+    if (activeDesk === desk) return;
+    if (activeDesk) activeDesk.el.classList.remove("active");
+    activeDesk = desk;
+    if (desk) desk.el.classList.add("active");
+  }
+
+  function updateTaskbar(desk) {
+    PINNED.forEach((id) => {
+      const btn = desk.pins[id];
+      const open = desk.windows.filter((r) => r.app.id === id);
+      btn.classList.toggle("run", open.length > 0);
+      btn.classList.toggle("on", !!desk.focused && !desk.focused.min && desk.focused.app.id === id);
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".tb-start") || e.target.closest(".startmenu")) return;
+    closeAllPopups();
+  });
+
+  let lastClock = "";
+  setInterval(() => {
+    const now = new Date();
+    const t = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (t === lastClock || !desks.length) return;
+    lastClock = t;
+    const p = (v) => String(v).padStart(2, "0");
+    const d = p(now.getDate()) + "-" + p(now.getMonth() + 1) + "-" + now.getFullYear();
+    desks.forEach((k) => { k.clockT.textContent = t; k.clockD.textContent = d; });
+  }, 1000);
+
+  $("#btnBrowserAll").addEventListener("click", () => {
+    if (mirror) openApp(desks[0], "browser");
+    else desks.forEach((d) => openApp(d, "browser"));
+  });
+
+  /* =========================================================
+     Window manager
+     ========================================================= */
+  // a window opened in duplicate mode exists once per screen; the copies are one group
+  function openApp(desk, appId, payload) {
+    if (!mirror) return createWindow(desk, appId, payload);
+    const group = desks.map((d) => createWindow(d, appId, payload));
+    group.forEach((r) => { r.group = group; });
+    raise(group[0]);
+    return group[0];
+  }
+
+  function peers(rec) {
+    return rec.group && rec.group.length ? rec.group.slice() : [rec];
+  }
+
+  let syncing = false;
+  function broadcast(rec, msg) {
+    if (syncing || !rec.group) return;
+    syncing = true;
+    rec.group.forEach((p) => { if (p !== rec && p.sync) p.sync(msg); });
+    syncing = false;
+  }
+
+  function createWindow(desk, appId, payload) {
+    const app = APPS.find((a) => a.id === appId);
+    const host = desk.winsEl.getBoundingClientRect();
+
+    const win = document.createElement("div");
+    win.className = "win";
+    const w = Math.min(app.w, Math.max(180, host.width - 20));
+    const h = Math.min(app.h, Math.max(140, host.height - 20));
+    const off = (desk.seq++ % 5) * 18;
+    win.style.width = w + "px";
+    win.style.height = h + "px";
+    win.style.left = Math.max(0, Math.min(24 + off, host.width - w)) + "px";
+    win.style.top = Math.max(0, Math.min(16 + off, host.height - h)) + "px";
+    win.style.zIndex = ++zTop;
+
+    const bar = document.createElement("div");
+    bar.className = "titlebar";
+    const title = document.createElement("span");
+    title.className = "t";
+    title.textContent = app.name;
+    bar.append(svg(app.icon, 15), title);
+
+    const mkBtn = (label, cls, fn) => {
+      const b = document.createElement("button");
+      b.className = "wbtn " + (cls || "");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+      bar.appendChild(b);
+      return b;
+    };
+
+    const body = document.createElement("div");
+    body.className = "wbody";
+
+    const rec = { el: win, desk: desk, app: app, title: title, body: body, min: false, group: null, sync: null };
+
+    mkBtn("\u2500", "", () => toggleMin(rec));
+    mkBtn("\u2610", "", () => {
+      const on = !win.classList.contains("max");
+      peers(rec).forEach((r) => r.el.classList.toggle("max", on));
+    });
+    mkBtn("\u2715", "close", () => closeWin(rec));
+
+    const grip = document.createElement("div");
+    grip.className = "resize";
+
+    win.append(bar, body, grip);
+    desk.winsEl.appendChild(win);
+    desk.windows.push(rec);
+
+    body.appendChild(buildApp(appId, desk, rec, payload));
+
+    win.addEventListener("pointerdown", () => raise(rec));
+    dragify(win, bar, desk, rec);
+    resizify(win, grip, desk, rec);
+    raise(rec);
+    return rec;
+  }
+
+  function raise(rec) {
+    peers(rec).forEach((r) => {
+      r.el.style.zIndex = ++zTop;
+      r.desk.focused = r;
+      r.desk.windows.forEach((x) => x.el.classList.toggle("focus", x === r));
+      updateTaskbar(r.desk);
+    });
+    focusDesk(rec.desk);
+  }
+
+  function toggleMin(rec) {
+    const min = !rec.min;
+    peers(rec).forEach((r) => {
+      r.min = min;
+      r.el.classList.toggle("hidden", min);
+      if (min && r.desk.focused === r) r.desk.focused = null;
+      updateTaskbar(r.desk);
+    });
+    if (!min) raise(rec);
+  }
+
+  function closeWin(rec) {
+    peers(rec).forEach((r) => {
+      r.group = null;
+      r.el.remove();
+      const i = r.desk.windows.indexOf(r);
+      if (i > -1) r.desk.windows.splice(i, 1);
+      if (r.desk.focused === r) r.desk.focused = null;
+      updateTaskbar(r.desk);
+    });
+  }
+
+  // dragging moves a transform (no layout per frame) and commits left/top once at the end
+  function dragify(win, handle, desk, rec) {
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".wbtn") || win.classList.contains("max")) return;
+      const host = desk.winsEl.getBoundingClientRect();
+      const r = win.getBoundingClientRect();
+      const startX = e.clientX, startY = e.clientY;
+      const baseLeft = r.left - host.left, baseTop = r.top - host.top;
+      const maxX = host.width - 60 - baseLeft, maxY = host.height - 30 - baseTop;
+      const copies = peers(rec);
+      let dx = 0, dy = 0, frame = 0;
+      handle.setPointerCapture(e.pointerId);
+      copies.forEach((c) => c.el.classList.add("moving"));
+      const apply = () => {
+        frame = 0;
+        const t = "translate3d(" + dx + "px," + dy + "px,0)";
+        copies.forEach((c) => { c.el.style.transform = t; });
+      };
+      const move = (ev) => {
+        dx = Math.max(-baseLeft, Math.min(ev.clientX - startX, maxX));
+        dy = Math.max(-baseTop, Math.min(ev.clientY - startY, maxY));
+        if (!frame) frame = requestAnimationFrame(apply);
+      };
+      const up = () => {
+        if (frame) { cancelAnimationFrame(frame); frame = 0; }
+        copies.forEach((c) => {
+          c.el.style.transform = "";
+          c.el.style.left = (baseLeft + dx) + "px";
+          c.el.style.top = (baseTop + dy) + "px";
+          c.el.classList.remove("moving");
+        });
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", up);
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", up);
+    });
+  }
+
+  function resizify(win, grip, desk, rec) {
+    grip.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      if (win.classList.contains("max")) return;
+      const host = desk.winsEl.getBoundingClientRect();
+      const r = win.getBoundingClientRect();
+      const sx = e.clientX, sy = e.clientY, sw = r.width, sh = r.height;
+      const maxW = host.width - win.offsetLeft, maxH = host.height - win.offsetTop;
+      const copies = peers(rec);
+      let w = sw, h = sh, frame = 0;
+      grip.setPointerCapture(e.pointerId);
+      const apply = () => {
+        frame = 0;
+        copies.forEach((c) => { c.el.style.width = w + "px"; c.el.style.height = h + "px"; });
+      };
+      const move = (ev) => {
+        w = Math.max(210, Math.min(sw + ev.clientX - sx, maxW));
+        h = Math.max(140, Math.min(sh + ev.clientY - sy, maxH));
+        if (!frame) frame = requestAnimationFrame(apply);
+      };
+      const up = () => {
+        if (frame) { cancelAnimationFrame(frame); frame = 0; }
+        grip.removeEventListener("pointermove", move);
+        grip.removeEventListener("pointerup", up);
+        grip.removeEventListener("pointercancel", up);
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", up);
+      grip.addEventListener("pointercancel", up);
+    });
+  }
+
+  /* =========================================================
+     Applications
+     ========================================================= */
+  function buildApp(id, desk, rec, payload) {
+    if (id === "browser") return buildBrowser(desk, rec);
+    if (id === "files") return buildFiles(desk, rec, payload);
+    if (id === "notes") return buildNotes(desk, rec, payload);
+    if (id === "term") return buildTerminal(desk, rec);
+    return buildSettings(desk, rec);
+  }
+
+  /* ---- Browser ---- */
+  const QUICK = [
+    { label: "Google", url: "https://www.google.com", tag: "G", color: "#4285f4" },
+    { label: "YouTube", url: "https://www.youtube.com", tag: "Y", color: "#ff0033" },
+    { label: "WhatsApp", url: "https://web.whatsapp.com", tag: "W", color: "#25d366" },
+    { label: "Wikipedia", url: "https://www.wikipedia.org", tag: "W", color: "#6b6b6b" },
+    { label: "GitHub", url: "https://github.com", tag: "G", color: "#3d444d" },
+    { label: "MDN", url: "https://developer.mozilla.org", tag: "M", color: "#1b1b1b" },
+    { label: "Example", url: "https://example.com", tag: "E", color: "#0a66c2" }
+  ];
+
+  // sites that send X-Frame-Options / frame-ancestors: load them through compatibility mode instead
+  const NO_EMBED = /(^|\.)(google\.[a-z.]+|youtube\.com|youtu\.be|whatsapp\.com|facebook\.com|instagram\.com|twitter\.com|x\.com|linkedin\.com|amazon\.[a-z.]+|github\.com|gmail\.com|netflix\.com|reddit\.com|bing\.com|duckduckgo\.com|yahoo\.com|microsoft\.com|live\.com|office\.com|zoom\.us|paypal\.com|flipkart\.com)$/i;
+
+  const SEARCH_URL = "https://lite.duckduckgo.com/lite/?q=";
+
+  // read-only HTML relays that strip frame-blocking headers so the page can render inside the window
+  const PROXIES = [
+    (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+    (u) => "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(u)
+  ];
+
+  // last resort: a relay that returns the readable text of any page (works even for Google/YouTube)
+  const READERS = [
+    (u) => "https://r.jina.ai/" + u,
+    (u) => "https://r.jina.ai/" + encodeURIComponent(u)
+  ];
+
+  async function grab(url, ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+      if (!res.ok) return null;
+      const text = await res.text();
+      return text && text.length > 40 ? text : null;
+    } catch (err) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // all relays are tried at once; the first usable answer wins
+  function raceGrab(urls, ms, accept) {
+    return new Promise((resolve) => {
+      let pending = urls.length;
+      let settled = false;
+      urls.forEach((u) => {
+        grab(u, ms).then((text) => {
+          if (settled) return;
+          if (text && (!accept || accept(text))) { settled = true; resolve(text); return; }
+          if (--pending === 0) resolve(null);
+        });
+      });
+    });
+  }
+
+  function fetchPage(url) {
+    return raceGrab(PROXIES.map((f) => f(url)), 9000, (t) => /<\/(html|body|div|p)>/i.test(t));
+  }
+
+  function fetchReadable(url) {
+    return raceGrab(READERS.map((f) => f(url)), 25000);
+  }
+
+  // remote text is inserted with DOM calls only, never innerHTML
+  function renderReader(text, baseUrl, onLink) {
+    const wrap = document.createElement("div");
+    wrap.className = "reader";
+    text.replace(/^Markdown Content:\s*$/gm, "").split(/\r?\n/).forEach((line) => {
+      const t = line.trim();
+      if (!t || /^(URL Source|Published Time|Warning):/i.test(t)) return;
+      let el;
+      const head = /^(#{1,6})\s+(.*)$/.exec(t);
+      const title = /^Title:\s*(.+)$/i.exec(t);
+      if (title) { el = document.createElement("h3"); el.textContent = title[1]; wrap.appendChild(el); return; }
+      if (head) el = document.createElement(head[1].length <= 2 ? "h3" : "h4");
+      else if (/^[-*+]\s+/.test(t)) el = document.createElement("li");
+      else el = document.createElement("p");
+      const body = (head ? head[2] : t.replace(/^[-*+]\s+/, "")).replace(/\*\*([^*]+)\*\*/g, "$1").replace(/__([^_]+)__/g, "$1");
+      inline(el, body, baseUrl, onLink);
+      wrap.appendChild(el);
+    });
+    if (!wrap.childNodes.length) {
+      const p = document.createElement("p");
+      p.textContent = text.slice(0, 4000);
+      wrap.appendChild(p);
+    }
+    return wrap;
+  }
+
+  function inline(el, text, baseUrl, onLink) {
+    const re = /!?\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g;
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) linkify(el, text.slice(last, m.index), onLink);
+      const label = m[1] || m[2];
+      if (m[0].charAt(0) === "!") {
+        if (m[1]) el.appendChild(document.createTextNode("[" + m[1] + "]"));
+      } else {
+        let abs = m[2];
+        try { abs = new URL(m[2], baseUrl).href; } catch (err) { /* keep raw */ }
+        el.appendChild(linkEl(label, abs, onLink));
+      }
+      last = re.lastIndex;
+    }
+    if (last < text.length) linkify(el, text.slice(last), onLink);
+  }
+
+  const BARE_URL = /(?:https?:\/\/[^\s<>()\[\]]+)|(?:\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|ai|co|in|dev|app|me|tv|info|edu|gov|uk|us)(?:\/[^\s<>()\[\]]*)?)/gi;
+
+  function linkify(el, text, onLink) {
+    let last = 0, m;
+    BARE_URL.lastIndex = 0;
+    while ((m = BARE_URL.exec(text)) !== null) {
+      if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const raw = m[0].replace(/[.,;:]$/, "");
+      el.appendChild(linkEl(raw, /^https?:/i.test(raw) ? raw : "https://" + raw, onLink));
+      last = m.index + raw.length;
+    }
+    if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+  }
+
+  function linkEl(label, url, onLink) {
+    const a = document.createElement("a");
+    a.textContent = label;
+    a.addEventListener("click", (ev) => { ev.preventDefault(); onLink(url); });
+    return a;
+  }
+
+  // relative assets must resolve against the real site, not the relay
+  function withBase(html, url) {
+    const tag = '<base href="' + url.replace(/"/g, "&quot;") + '">';
+    if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + tag);
+    return tag + html;
+  }
+
+  function hostOf(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ""); } catch (err) { return url; }
+  }
+
+  // search results point at a redirector; follow it here so the real page loads in the window
+  function unwrapRedirect(u) {
+    let hop = null;
+    if (/(^|\.)duckduckgo\.com$/i.test(u.hostname)) hop = u.searchParams.get("uddg");
+    else if (/(^|\.)google\.[a-z.]+$/i.test(u.hostname) && u.pathname === "/url") hop = u.searchParams.get("url") || u.searchParams.get("q");
+    if (hop) {
+      try {
+        const h = new URL(hop);
+        if (h.protocol === "http:" || h.protocol === "https:") return h.href;
+      } catch (err) { /* fall through */ }
+    }
+    return u.href;
+  }
+
+  function normalizeUrl(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return null;
+    let candidate = s;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)) {
+      if (/^[\w-]+(\.[\w-]+)+(\/|$|\?|#)/.test(candidate)) candidate = "https://" + candidate;
+      else return { search: true, q: s };
+    }
+    try {
+      const u = new URL(candidate);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return null; // block javascript:, data:, file:
+      return { url: unwrapRedirect(u) };
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function buildBrowser(desk, rec) {
+    const wrap = document.createElement("div");
+    wrap.className = "browser";
+
+    const bar = document.createElement("div");
+    bar.className = "bbar";
+    const home = document.createElement("button");
+    home.type = "button"; home.textContent = "\u2302"; home.title = "Home";
+    const reload = document.createElement("button");
+    reload.type = "button"; reload.textContent = "\u21BB"; reload.title = "Reload";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Search or type a web address";
+    input.spellcheck = false;
+    const go = document.createElement("button");
+    go.type = "button"; go.textContent = "\u2192"; go.title = "Go";
+    const compat = document.createElement("button");
+    compat.type = "button"; compat.textContent = "\u2922";
+    compat.title = "Force the page to open inside this window";
+    bar.append(home, reload, input, go, compat);
+
+    const view = document.createElement("div");
+    view.className = "bview";
+
+    const homePage = document.createElement("div");
+    homePage.className = "homepage";
+    const h3 = document.createElement("h3");
+    h3.textContent = "New tab";
+    const p = document.createElement("p");
+    p.textContent = desk.name + " \u2014 type an address, search, or pick a shortcut. Everything opens in this window.";
+    const links = document.createElement("div");
+    links.className = "links";
+    QUICK.forEach((q) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = q.color;
+      dot.textContent = q.tag;
+      const t = document.createElement("span");
+      t.textContent = q.label;
+      b.append(dot, t);
+      b.addEventListener("click", () => navigate(q.url));
+      links.appendChild(b);
+    });
+    const notice = document.createElement("div");
+    notice.className = "notice";
+    notice.textContent = "Sites that refuse to be framed (Google, YouTube, WhatsApp\u2026) are relayed through compatibility mode so they still appear here instead of a new tab. Complex apps may render simplified.";
+    homePage.append(h3, p, links, notice);
+
+    const frame = document.createElement("iframe");
+    frame.className = "hidden";
+    // no allow-same-origin (keeps the page out of our origin) and no allow-popups (nothing can spawn a tab)
+    frame.setAttribute("sandbox", "allow-scripts allow-forms");
+    frame.setAttribute("referrerpolicy", "no-referrer");
+
+    const status = document.createElement("div");
+    status.className = "bstatus hidden";
+    const statusText = document.createElement("span");
+    const statusBtn = document.createElement("button");
+    statusBtn.type = "button";
+    statusBtn.className = "hidden";
+    status.append(statusText, statusBtn);
+
+    const readerBox = document.createElement("div");
+    readerBox.className = "hidden";
+    readerBox.style.cssText = "position:absolute;inset:0";
+
+    view.append(frame, homePage, readerBox, status);
+    wrap.append(bar, view);
+
+    let currentUrl = "";
+    let statusTimer = 0;
+
+    function setStatus(text, action, fn, autoHide) {
+      clearTimeout(statusTimer);
+      statusText.textContent = text;
+      statusBtn.classList.toggle("hidden", !action);
+      statusBtn.textContent = action || "";
+      statusBtn.onclick = fn || null;
+      status.classList.remove("hidden");
+      if (autoHide) statusTimer = setTimeout(() => status.classList.add("hidden"), autoHide);
+    }
+
+    function hideStatus() {
+      clearTimeout(statusTimer);
+      status.classList.add("hidden");
+    }
+
+    function showPane(pane) {
+      frame.classList.toggle("hidden", pane !== "frame");
+      readerBox.classList.toggle("hidden", pane !== "reader");
+      homePage.classList.toggle("hidden", pane !== "home");
+    }
+
+    function loadDirect(url) {
+      currentUrl = url;
+      compat.classList.remove("on");
+      frame.removeAttribute("srcdoc");
+      frame.src = url;
+      showPane("frame");
+      input.value = url;
+      rec.title.textContent = "Browser \u2014 " + hostOf(url);
+      setStatus("Loading " + hostOf(url) + "\u2026 blank page? Use \u2922 to force it into this window",
+        "Show it here", () => loadCompat(url), 8000);
+    }
+
+    async function loadCompat(url) {
+      currentUrl = url;
+      compat.classList.add("on");
+      input.value = url;
+      rec.title.textContent = "Browser \u2014 " + hostOf(url);
+      setStatus("Opening " + hostOf(url) + " inside this window\u2026");
+
+      // relay and reader are fetched together; the relay only gets a short head start
+      const relayP = fetchPage(url);
+      const readerP = fetchReadable(url);
+      const html = await Promise.race([relayP, new Promise((r) => setTimeout(() => r(null), 6000))]);
+      if (url !== currentUrl) return;
+
+      if (html !== null) {
+        frame.removeAttribute("src");
+        frame.srcdoc = withBase(html, url);
+        showPane("frame");
+        setStatus("Compatibility mode \u2014 " + hostOf(url), "", null, 2500);
+        return;
+      }
+
+      setStatus("Site is protected \u2014 loading a readable copy of " + hostOf(url) + "\u2026");
+      const text = await readerP;
+      if (url !== currentUrl) return;
+      if (text === null) {
+        setStatus("Could not open " + hostOf(url) + " here \u2014 check the internet connection.", "Try again", () => loadCompat(url));
+        return;
+      }
+      readerBox.textContent = "";
+      readerBox.appendChild(renderReader(text, url, (link) => navigate(link)));
+      readerBox.scrollTop = 0;
+      showPane("reader");
+      setStatus("Reader view \u2014 " + hostOf(url), "", null, 3000);
+    }
+
+    function navigate(raw) {
+      const res = normalizeUrl(raw);
+      if (!res) { input.value = ""; input.placeholder = "Only http:// and https:// addresses are allowed"; return; }
+      broadcast(rec, { url: raw });
+      if (res.search) { loadCompat(SEARCH_URL + encodeURIComponent(res.q)); input.value = res.q; return; }
+      if (NO_EMBED.test(new URL(res.url).hostname)) loadCompat(res.url);
+      else loadDirect(res.url);
+    }
+
+    rec.sync = (m) => {
+      if (m.url !== undefined) navigate(m.url);
+      else if (m.home) goHome();
+    };
+
+    go.addEventListener("click", () => navigate(input.value));
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") navigate(input.value); });
+    reload.addEventListener("click", () => {
+      if (!currentUrl) return;
+      if (compat.classList.contains("on")) loadCompat(currentUrl);
+      else loadDirect(currentUrl);
+    });
+    compat.addEventListener("click", () => { if (currentUrl) loadCompat(currentUrl); });
+
+    function goHome() {
+      hideStatus();
+      currentUrl = "";
+      compat.classList.remove("on");
+      frame.removeAttribute("srcdoc");
+      frame.src = "about:blank";
+      readerBox.textContent = "";
+      showPane("home");
+      input.value = "";
+      rec.title.textContent = "Browser";
+    }
+    home.addEventListener("click", () => { broadcast(rec, { home: true }); goHome(); });
+
+    return wrap;
+  }
+
+  /* ---- Files ---- */
+  const FS = {
+    "C:/": [
+      { n: "Documents", t: "dir" },
+      { n: "Pictures", t: "dir" },
+      { n: "Recycle Bin", t: "dir" },
+      { n: "readme.txt", t: "file", i: "doc", s: "1 KB", c: "Multi Desktop\r\n==============\r\nEvery tile on screen is a full computer desktop." },
+      { n: "manual.pdf", t: "file", i: "pdf", s: "820 KB", c: "[PDF preview]\r\n\r\nMulti Desktop user manual\r\nPage 1 of 1" }
+    ],
+    "C:/Documents/": [
+      { n: "..", t: "up" },
+      { n: "todo.txt", t: "file", i: "doc", s: "2 KB", c: "1. Open the browser\r\n2. Split the screen\r\n3. Work on 4 desktops" },
+      { n: "report.docx", t: "file", i: "word", s: "36 KB", c: "Monthly report\r\n\r\nAll four desktops are running." },
+      { n: "budget.xlsx", t: "file", i: "xls", s: "18 KB", c: "Coffee ......... 3\r\nInternet ....... 25\r\nTotal .......... 28" }
+    ],
+    "C:/Pictures/": [
+      { n: "..", t: "up" },
+      { n: "wallpaper.jpg", t: "file", i: "img", s: "1.4 MB", c: "[Image preview]\r\n\r\nChange the wallpaper from Settings." },
+      { n: "screenshot.png", t: "file", i: "img", s: "640 KB", c: "[Image preview]\r\n\r\nScreenshot of the desktop." }
+    ],
+    "C:/Recycle Bin/": [
+      { n: "..", t: "up" }
+    ]
+  };
+
+  function buildFiles(desk, rec, startPath) {
+    const wrap = document.createElement("div");
+    wrap.className = "files";
+    const path = document.createElement("div");
+    path.className = "path";
+    const crumb = document.createElement("b");
+    path.append(crumb);
+    const list = document.createElement("div");
+    list.className = "flist";
+    wrap.append(path, list);
+
+    let cur = FS[startPath] ? startPath : "C:/";
+    function render() {
+      crumb.textContent = cur.replace(/\//g, " \u203A ").replace(/ \u203A $/, "");
+      rec.title.textContent = "File Explorer \u2014 " + (cur === "C:/" ? "Local Disk (C:)" : cur.split("/").slice(-2)[0]);
+      list.textContent = "";
+      const items = FS[cur] || [];
+      if (!items.some((x) => x.t !== "up")) {
+        const empty = document.createElement("div");
+        empty.style.cssText = "padding:24px;text-align:center;color:#9a9a9a";
+        empty.textContent = "This folder is empty";
+        list.appendChild(empty);
+      }
+      items.forEach((item) => {
+        const b = document.createElement("button");
+        b.className = "frow";
+        b.type = "button";
+        b.appendChild(svg(item.t === "dir" ? "folder" : item.t === "up" ? "up" : (item.i || "doc"), 20));
+        const name = document.createElement("span");
+        name.textContent = item.t === "up" ? ".." : item.n;
+        b.appendChild(name);
+        if (item.s) {
+          const sz = document.createElement("span");
+          sz.className = "sz";
+          sz.textContent = item.s;
+          b.appendChild(sz);
+        }
+        b.addEventListener("click", () => {
+          if (item.t === "dir") { cur = cur + item.n + "/"; broadcast(rec, { path: cur }); render(); }
+          else if (item.t === "up") { cur = "C:/"; broadcast(rec, { path: cur }); render(); }
+          else openApp(desk, "notes", { title: item.n, text: item.c });
+        });
+        list.insertBefore(b, item.t === "up" ? list.firstChild : null);
+      });
+    }
+    render();
+    rec.sync = (m) => { if (m.path) { cur = m.path; render(); } };
+    return wrap;
+  }
+
+  /* ---- Notes ---- */
+  function buildNotes(desk, rec, payload) {
+    const ta = document.createElement("textarea");
+    ta.className = "pad";
+    ta.spellcheck = false;
+    if (payload) {
+      ta.value = payload.text;
+      rec.title.textContent = payload.title + " \u2014 Notepad";
+    } else {
+      ta.value = desk.notes;
+      rec.title.textContent = "Untitled \u2014 Notepad";
+    }
+    ta.addEventListener("input", () => {
+      if (!payload) desk.notes = ta.value;
+      broadcast(rec, { text: ta.value });
+    });
+    rec.sync = (m) => {
+      if (m.text === undefined) return;
+      ta.value = m.text;
+      if (!payload) desk.notes = m.text;
+    };
+    return ta;
+  }
+
+  /* ---- Terminal ---- */
+  function buildTerminal(desk, rec) {
+    const wrap = document.createElement("div");
+    wrap.className = "term";
+    const out = document.createElement("div");
+    out.className = "tout";
+    out.textContent =
+      "Multi Desktop PowerShell\nCopyright (C) Multi Desktop. " + desk.name + ".\nType \"help\" for commands.\n\n";
+    const line = document.createElement("div");
+    line.className = "tin";
+    const ps = document.createElement("span");
+    ps.textContent = "PS C:\\Users\\User>";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.spellcheck = false;
+    line.append(ps, input);
+    wrap.append(out, line);
+
+    const print = (s) => { out.textContent += s + "\n"; out.scrollTop = out.scrollHeight; };
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      const raw = input.value;
+      input.value = "";
+      print(ps.textContent + " " + raw);
+      const parts = raw.trim().split(/\s+/);
+      const cmd = (parts[0] || "").toLowerCase();
+      const arg = parts.slice(1).join(" ");
+      switch (cmd) {
+        case "": break;
+        case "help":
+          print("help  cls  date  whoami  dir  echo <text>  desktops  start <app>  close\napps: " +
+            APPS.map((a) => a.id).join(", "));
+          break;
+        case "cls":
+        case "clear": out.textContent = ""; break;
+        case "date": print(new Date().toString()); break;
+        case "whoami": print("multidesktop\\user (" + desk.name + ")"); break;
+        case "dir":
+        case "ls": print("Directory: C:\\\n\n  Documents\n  Pictures\n  Recycle Bin\n  readme.txt\n  manual.pdf"); break;
+        case "echo": print(arg); break;
+        case "desktops": print(desks.length + " desktop(s) running: " + desks.map((d) => d.name).join(", ")); break;
+        case "start":
+        case "open":
+          if (APPS.some((a) => a.id === arg)) { openApp(desk, arg); print("opening " + arg + "…"); }
+          else print("unknown app: " + arg);
+          break;
+        case "close":
+          desk.windows.slice().forEach(closeWin);
+          break;
+        default: print("command not found: " + cmd);
+      }
+      broadcast(rec, { out: out.textContent });
+    });
+
+    rec.sync = (m) => {
+      if (m.out === undefined) return;
+      out.textContent = m.out;
+      out.scrollTop = out.scrollHeight;
+    };
+
+    setTimeout(() => input.focus(), 30);
+    return wrap;
+  }
+
+  /* ---- Settings ---- */
+  function buildSettings(desk, rec) {
+    const wrap = document.createElement("div");
+    wrap.className = "settings";
+
+    const nameBox = document.createElement("div");
+    nameBox.className = "card";
+    const nameLbl = document.createElement("label");
+    nameLbl.textContent = "PC name";
+    const nameIn = document.createElement("input");
+    nameIn.type = "text";
+    nameIn.value = desk.name;
+    nameIn.addEventListener("input", () => {
+      const value = nameIn.value || (mirror ? "This PC" : "Desktop " + (desk.index + 1));
+      if (mirror) pcName = value; else desk.name = value;
+      refreshNames();
+      broadcast(rec, { name: nameIn.value });
+    });
+    nameBox.append(nameLbl, nameIn);
+
+    const wallBox = document.createElement("div");
+    wallBox.className = "card";
+    const wallLbl = document.createElement("label");
+    wallLbl.textContent = "Personalisation \u2014 background";
+    const sw = document.createElement("div");
+    sw.className = "swatches";
+    const pick = (i) => {
+      screens(desk).forEach((d) => {
+        d.wall.classList.remove("wp" + d.theme);
+        d.theme = i;
+        d.wall.classList.add("wp" + i);
+      });
+      sw.querySelectorAll(".sw").forEach((x, j) => x.classList.toggle("on", j === i));
+    };
+    WALLPAPERS.forEach((wpName, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.title = wpName;
+      b.className = "sw wp" + i + (i === desk.theme ? " on" : "");
+      b.addEventListener("click", () => { pick(i); broadcast(rec, { theme: i }); });
+      sw.appendChild(b);
+    });
+    wallBox.append(wallLbl, sw);
+
+    rec.sync = (m) => {
+      if (m.theme !== undefined) pick(m.theme);
+      if (m.name !== undefined) nameIn.value = m.name;
+    };
+
+    const actions = document.createElement("div");
+    actions.className = "card";
+    const actLbl = document.createElement("label");
+    actLbl.textContent = "System";
+    const row = document.createElement("div");
+    row.className = "row";
+    const b1 = document.createElement("button");
+    b1.type = "button"; b1.textContent = "Close all windows";
+    b1.addEventListener("click", () => desk.windows.slice().forEach(closeWin));
+    const b2 = document.createElement("button");
+    b2.type = "button"; b2.textContent = "Open browser";
+    b2.addEventListener("click", () => openApp(desk, "browser"));
+    const b3 = document.createElement("button");
+    b3.type = "button"; b3.textContent = "Full screen this PC";
+    b3.addEventListener("click", () => $(".zbtn", desk.el).click());
+    row.append(b1, b2, b3);
+    actions.append(actLbl, row);
+
+    const info = document.createElement("div");
+    info.className = "notice";
+    info.textContent = "Duplicate mode shows this one PC on every screen, like an HDMI splitter. Switch to separate PCs from the top bar.";
+
+    wrap.append(nameBox, wallBox, actions, info);
+    return wrap;
+  }
+})();
+</script>
+</body>
+</html>
